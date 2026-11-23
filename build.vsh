@@ -67,7 +67,11 @@ fn spinner(ch chan bool, silent bool) {
 fn download_webview2() {
 	http.download_file('https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2',
 		'${lib_dir}/webview2.zip') or { panic(err) }
-	unzip_res := execute('powershell -command Expand-Archive -LiteralPath ${lib_dir}/webview2.zip -DestinationPath ${lib_dir}/webview2')
+	mkdir_all('${lib_dir}/webview2') or { panic(err) }
+	mut unzip_res := execute('tar -xf "${lib_dir}/webview2.zip" -C "${lib_dir}/webview2"')
+	if unzip_res.exit_code != 0 {
+		unzip_res = execute('powershell -command Expand-Archive -LiteralPath ${lib_dir}/webview2.zip -DestinationPath ${lib_dir}/webview2 -Force')
+	}
 	if unzip_res.exit_code != 0 {
 		eprintln(unzip_res.output)
 		exit(1)
@@ -111,7 +115,9 @@ fn build(silent bool) {
 
 fn run(cmd cli.Command) ! {
 	// Remove old library files
-	execute('rm ${lib_dir}/webview.*')
+	rm('${lib_dir}/webview.h') or {}
+	rm('${lib_dir}/webview.cc') or {}
+	rm('${lib_dir}/webview.o') or {}
 	silent := cmd.flags.get_bool('silent')!
 	download(silent)
 	time.sleep(100 * time.millisecond)

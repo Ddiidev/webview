@@ -1,6 +1,6 @@
 module webview
 
-import json
+import json2
 
 enum ReturnKind {
 	value
@@ -23,7 +23,8 @@ fn (e &Event) @return[T](result T, kind ReturnKind) {
 	$if result is voidptr {
 		C.webview_return(e.instance, e.event_id, int(kind), &char(''.str))
 	} $else {
-		C.webview_return(e.instance, e.event_id, int(kind), &char(json.encode(result).str))
+		encoded := json2.encode(result)
+		C.webview_return(e.instance, e.event_id, int(kind), &char(encoded.str))
 	}
 }
 
@@ -41,7 +42,7 @@ fn (e &Event) async() &Event {
 }
 
 fn (e &Event) get_args_json[T](idx int) !T {
-	args := json.decode([]T, unsafe { e.args.vstring() }) or {
+	args := json2.decode[[]T](unsafe { e.args.vstring() }) or {
 		return error('Failed decoding argument of type `${T.name}` at index `${idx}`. ${err}')
 	}
 	i := if idx < 0 { args.len + idx } else { idx }
@@ -51,11 +52,14 @@ fn (e &Event) get_args_json[T](idx int) !T {
 }
 
 fn (e &Event) get_complex_args_json[T](idx int) !T {
-	raw_args := json.decode([]string, unsafe { e.args.vstring() }) or {
+	raw_args := json2.decode[[]string](unsafe { e.args.vstring() }) or {
 		return error('Failed decoding argument of type `${T.name}` at index `${idx}`. ${err}')
 	}
 	i := if idx < 0 { raw_args.len + idx } else { idx }
-	return json.decode(T, raw_args[i] or {
+	val_str := raw_args[i] or {
 		return error('Failed finding argument of type `${T.name}` at index `${idx}`')
-	}) or { return error('Failed decoding argument of type `${T.name}` at index `${idx}`. ${err}') }
+	}
+	return json2.decode[T](val_str) or {
+		return error('Failed decoding argument of type `${T.name}` at index `${idx}`. ${err}')
+	}
 }

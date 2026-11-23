@@ -4,4 +4,5 @@ Module{
 	version: '0.7.0'
 	license: 'MIT'
 	dependencies: []
+	base_url: 'src'
 }
