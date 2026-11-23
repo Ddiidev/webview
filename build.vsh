@@ -65,12 +65,17 @@ fn spinner(ch chan bool, silent bool) {
 
 @[if windows]
 fn download_webview2() {
+	zip_path := '${lib_dir}/webview2.zip'
+	extract_dir := '${lib_dir}/webview2'
 	http.download_file('https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2',
-		'${lib_dir}/webview2.zip') or { panic(err) }
-	mkdir_all('${lib_dir}/webview2') or { panic(err) }
-	mut unzip_res := execute('tar -xf "${lib_dir}/webview2.zip" -C "${lib_dir}/webview2"')
-	if unzip_res.exit_code != 0 {
-		unzip_res = execute('powershell -command Expand-Archive -LiteralPath ${lib_dir}/webview2.zip -DestinationPath ${lib_dir}/webview2 -Force')
+		zip_path) or { panic(err) }
+	mkdir_all(extract_dir) or { panic(err) }
+	// Use PowerShell's Expand-Archive with -Force for reliable extraction on Windows CI runners.
+	// os.exec passes arguments as an array, avoiding shell-injection and path quoting issues.
+	unzip_res := os.exec(['powershell', '-NoProfile', '-Command',
+		'Expand-Archive -LiteralPath "${zip_path}" -DestinationPath "${extract_dir}" -Force']) or {
+		eprintln('Failed to run Expand-Archive: ${err}')
+		exit(1)
 	}
 	if unzip_res.exit_code != 0 {
 		eprintln(unzip_res.output)
@@ -92,7 +97,7 @@ fn build(silent bool) {
 	mut cmd := '${cxx} -c ${lib_dir}/webview.cc -DWEBVIEW_STATIC -o ${lib_dir}/webview.o'
 	cmd += $if darwin { ' -std=c++11' } $else { ' -std=c++17' }
 	$if linux {
-		cmd += ' $(pkg-config --cflags gtk+-3.0 webkit2gtk-4.0)'
+		cmd += ' $(pkg-config --cflags gtk+-3.0 webkit2gtk-4.1)'
 	} $else $if windows {
 		defer {
 			// Cleanup
